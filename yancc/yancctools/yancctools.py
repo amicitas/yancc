@@ -3,9 +3,12 @@ from scipy.optimize import brentq
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 import plotly.graph_objects as go
+import logging
 
 from yancc.solve import solve_dke
 from yancc.field import Field
+
+logger = logging.getLogger(__name__)
 
 def calculate_net_charge_flux(erho: float, field, pitchgrid, speedgrid, species, **kwargs):
     """
@@ -31,14 +34,26 @@ def find_ambipolar_roots(
         species,
         erho_min: float = -10000.0,
         erho_max: float = 10000.0,
-        n_points: int = 21,
+        erho_num: int = 21,
+        show_plot: bool = False,
+        rho: float = None,
         **kwargs
         ):
     """
     Scans a range of Erho values (sequentially) to bracket and find all roots
     where the net charge flux is zero.
+    
+    Returns
+    -------
+    erho_grid : np.ndarray
+        The Erho values evaluated during the coarse scan.
+    flux_diffs : np.ndarray
+        The corresponding net charge fluxes from the scan.
+    roots_detailed : list of dict
+        List containing {"Er": float, "fluxes": dict} for each root found.
     """
-    erho_grid = np.linspace(erho_min, erho_max, n_points)
+    logger.info(f"Finding ambipolar roots for rho={rho if rho is not None else 'unknown'}")
+    erho_grid = np.linspace(erho_min, erho_max, erho_num)
 
     worker_func = partial(
         calculate_net_charge_flux,
@@ -50,48 +65,84 @@ def find_ambipolar_roots(
     )
 
     # Coarse scan (serial)
-    flux_diffs = [worker_func(er) for er in erho_grid]
+    logger.debug(f"Starting coarse scan with {erho_num} points...")
+    flux_diffs = []
+    for i, er in enumerate(erho_grid):
+        val = worker_func(er)
+        flux_diffs.append(val)
+        if (i + 1) % 5 == 0 or (i + 1) == erho_num:
+             logger.debug(f"Progress: {i+1}/{erho_num} points evaluated.")
+    
     flux_diffs = np.array(flux_diffs)
 
-    roots = []
+    roots_detailed = []
+    logger.debug("Scanning brackets for sign changes...")
     for i in range(len(erho_grid) - 1):
         if flux_diffs[i] * flux_diffs[i + 1] <= 0:
+            logger.info(f"Found bracket at Erho = [{erho_grid[i]:.2f}, {erho_grid[i+1]:.2f}] V/m. Refining...")
             try:
-                root = brentq(worker_func, erho_grid[i], erho_grid[i + 1], xtol=1.0)
-                roots.append(root)
-            except ValueError:
+                root_er = brentq(worker_func, erho_grid[i], erho_grid[i + 1], xtol=1.0)
+                logger.info(f"Refined root found at Erho = {root_er:.2f} V/m. Retrieving full fluxes...")
+                
+                # Retrieve full fluxes at the final root
+                _, _, fluxes, _ = solve_dke(
+                    field, pitchgrid, speedgrid, species, root_er, print_every=0, **kwargs
+                )
+                
+                roots_detailed.append({
+                    "Er": float(root_er),
+                    "fluxes": fluxes
+                })
+            except ValueError as e:
+                logger.warning(f"Brentq refinement failed in bracket {i}: {e}")
                 pass
 
-    return erho_grid, flux_diffs, sorted(roots)
+    # Sort detailed roots by Er value
+    roots_detailed.sort(key=lambda x: x["Er"])
+    
+    logger.info(f"Finished root finding. Found {len(roots_detailed)} root(s).")
+    
+    if show_plot:
+        title = f"Ambipolar Search (rho={rho})" if rho is not None else "Ambipolar Search"
+        plot_ambipolar_scan(erho_grid, flux_diffs, roots_detailed, title=title)
+
+    return erho_grid, flux_diffs, roots_detailed
 
 
-def _worker_rho_scan(rho, eq_type, eq_data, nt, nz, pitchgrid, speedgrid, global_species, erho_min, erho_max, n_points, **kwargs):
+def _worker_rho_scan(rho, eq_type, eq_data, nt, nz, pitchgrid, speedgrid, global_species, erho_min, erho_max, erho_num, show_plots, **kwargs):
     """
     Worker function for radial scan. 
     Constructs the field and localizes species at a specific rho, then finds roots.
     """
+    logger.info(f"Worker starting for rho={rho:.4f}")
     # 1. Reconstruct Field at this rho
-    if eq_type == "desc":
-        field = Field.from_desc(eq_data, rho, nt, nz)
-    elif eq_type == "vmec":
-        field = Field.from_vmec(eq_data, rho**2, nt, nz) # VMEC from_vmec takes s=rho^2
-    elif eq_type == "booz_xform":
-        field = Field.from_booz_xform(eq_data, rho**2, nt, nz)
-    elif eq_type == "ipp_bc":
-        field = Field.from_ipp_bc(eq_data, rho**2, nt, nz)
-    else:
-        raise ValueError(f"Unknown equilibrium type: {eq_type}")
+    try:
+        if eq_type == "desc":
+            field = Field.from_desc(eq_data, rho, nt, nz)
+        elif eq_type == "vmec":
+            field = Field.from_vmec(eq_data, rho**2, nt, nz) 
+        elif eq_type == "booz_xform":
+            field = Field.from_booz_xform(eq_data, rho**2, nt, nz)
+        elif eq_type == "ipp_bc":
+            field = Field.from_ipp_bc(eq_data, rho**2, nt, nz)
+        else:
+            raise ValueError(f"Unknown equilibrium type: {eq_type}")
+    except Exception as e:
+        logger.error(f"Failed to construct field for rho={rho}: {e}")
+        return rho, []
 
     # 2. Localize species
     local_species = [s.localize(rho) for s in global_species]
 
     # 3. Find roots
-    _, _, roots = find_ambipolar_roots(
+    _, _, roots_detailed = find_ambipolar_roots(
         field, pitchgrid, speedgrid, local_species, 
-        erho_min=erho_min, erho_max=erho_max, n_points=n_points, **kwargs
+        erho_min=erho_min, erho_max=erho_max, erho_num=erho_num,
+        show_plot=show_plots, rho=rho, **kwargs
     )
     
-    return rho, roots
+    logger.info(f"Worker finished for rho={rho:.4f}. Found {len(roots_detailed)} roots.")
+    return rho, roots_detailed
 
 
 def scan_ambipolar_profile(
@@ -105,42 +156,20 @@ def scan_ambipolar_profile(
         global_species,
         erho_min: float = -10000.0,
         erho_max: float = 10000.0,
-        n_points: int = 21,
+        erho_num: int = 21,
         num_processors: int = 4,
+        show_plots: bool = True,
         **kwargs
         ):
     """
     Scans multiple radial surfaces in parallel to find ambipolar Erho profiles.
-
-    Parameters
-    ----------
-    rho_grid : np.ndarray
-        Array of rho (sqrt normalized toroidal flux) values to scan.
-    eq_type : str
-        One of "desc", "vmec", "booz_xform", "ipp_bc".
-    eq_data : 
-        The equilibrium object (for desc) or path to file (for others).
-    nt, nz : int
-        Field resolution.
-    pitchgrid, speedgrid : 
-        Velocity grid objects.
-    global_species : list of GlobalMaxwellian
-        Species definitions across radius.
-    erho_min, erho_max : float
-        Range for Erho search at each radius.
-    n_points : int
-        Number of points in the Erho scan at each radius.
-    num_processors : int
-        Number of parallel processes for the radial scan.
-    **kwargs :
-        Additional arguments for solve_dke.
-
+    
     Returns
     -------
     results : dict
-        A dictionary mapping rho to a list of found roots.
+        A nested dictionary: { "rho_str": [ {"Er": float, "fluxes": dict}, ... ] }
     """
-    print(f"Starting radial scan over {len(rho_grid)} surfaces with {num_processors} processors...")
+    logger.info(f"Starting radial scan over {len(rho_grid)} surfaces with {num_processors} processors...")
     
     worker = partial(
         _worker_rho_scan,
@@ -153,58 +182,54 @@ def scan_ambipolar_profile(
         global_species=global_species,
         erho_min=erho_min,
         erho_max=erho_max,
-        n_points=n_points,
+        erho_num=erho_num,
+        show_plots=show_plots,
         **kwargs
     )
 
-    with ProcessPoolExecutor(num_processors) as executor:
-        scan_results = list(executor.map(worker, rho_grid))
+    if num_processors > 1:
+        with ProcessPoolExecutor(num_processors) as executor:
+            scan_results = list(executor.map(worker, rho_grid))
+    else:
+        scan_results = [worker(rho) for rho in rho_grid]
 
-    # Sort results by rho just in case
+    # Sort results by rho
     scan_results.sort(key=lambda x: x[0])
     
-    return {rho: roots for rho, roots in scan_results}
+    results = {f"{rho:.2f}": roots for rho, roots in scan_results}
+    logger.info("Radial scan complete.")
+    return results
 
 
 def plot_ambipolar_profile(results: dict):
     """
-    Plots the radial profile of ambipolar electric fields.
-    Handles multiple roots by categorizing them (Ion, Electron, Unstable).
-    
-    Parameters
-    ----------
-    results : dict
-        Dictionary mapping rho to list of roots.
+    Plots the radial profile of ambipolar electric fields in kV/m.
     """
-    rhos = sorted(results.keys())
-    
-    # We'll organize roots by index.
-    # Typically, if there are 3 roots, they are sorted:
-    # 0: Ion root (usually most negative)
-    # 1: Unstable root
-    # 2: Electron root (usually most positive)
+    # Convert string keys back to floats for numerical plotting and sorting
+    rhos_numeric = sorted([float(r) for r in results.keys()])
     
     root_sets = {0: [], 1: [], 2: []}
     rho_sets = {0: [], 1: [], 2: []}
     
-    for r in rhos:
-        roots = sorted(results[r])
-        if len(roots) == 1:
-            # If only one root, we need to decide if it's "ion-like" or "electron-like"
-            # For simplicity, we'll just put it in the first set if it's alone,
-            # or try to match continuity if we were being fancy.
-            rho_sets[0].append(r)
-            root_sets[0].append(roots[0])
-        elif len(roots) >= 3:
-            for i in range(min(3, len(roots))):
-                rho_sets[i].append(r)
-                root_sets[i].append(roots[i])
-        elif len(roots) == 2:
-            # Rare case, likely at a bifurcation point
-            rho_sets[0].append(r)
-            root_sets[0].append(roots[0])
-            rho_sets[2].append(r)
-            root_sets[2].append(roots[1])
+    for r_num in rhos_numeric:
+        r_str = f"{r_num:.2f}"
+        # Extract Er values from the nested detailed roots
+        detailed_roots = results[r_str]
+        # Roots are already sorted by Er in find_ambipolar_roots
+        er_values = [rd["Er"] for rd in detailed_roots]
+        
+        if len(er_values) == 1:
+            rho_sets[0].append(r_num)
+            root_sets[0].append(er_values[0] / 1e3)
+        elif len(er_values) >= 3:
+            for i in range(min(3, len(er_values))):
+                rho_sets[i].append(r_num)
+                root_sets[i].append(er_values[i] / 1e3)
+        elif len(er_values) == 2:
+            rho_sets[0].append(r_num)
+            root_sets[0].append(er_values[0] / 1e3)
+            rho_sets[2].append(r_num)
+            root_sets[2].append(er_values[1] / 1e3)
 
     fig = go.Figure()
 
@@ -220,27 +245,27 @@ def plot_ambipolar_profile(results: dict):
                 mode='lines+markers',
                 name=names[i],
                 line=dict(color=colors[i], dash=dashes[i], width=2),
-                marker=dict(size=4)
+                marker=dict(size=6)
             ))
 
     fig.update_layout(
         title="Radial Profile of Ambipolar Electric Field",
         xaxis_title="Normalized Radius (rho)",
-        yaxis_title="Ambipolar E_rho [V/m]",
+        yaxis_title="Ambipolar E_rho [kV/m]",
         template="plotly_white",
         hovermode="x unified"
     )
 
     fig.show()
 
-def plot_ambipolar_scan(erho_grid: np.ndarray, flux_diffs: np.ndarray, roots: list):
+def plot_ambipolar_scan(erho_grid: np.ndarray, flux_diffs: np.ndarray, roots: list, title: str = "Ambipolar Electric Field Search"):
     """
-    Visualizes the coarse Erho scan and the refined ambipolar roots using Plotly.
+    Visualizes the coarse Erho scan and the refined ambipolar roots in kV/m.
     """
     fig = go.Figure()
 
     fig.add_trace(go.Scatter(
-        x=erho_grid, 
+        x=erho_grid / 1e3, 
         y=flux_diffs, 
         mode='lines+markers',
         name='Net Charge Flux',
@@ -258,9 +283,17 @@ def plot_ambipolar_scan(erho_grid: np.ndarray, flux_diffs: np.ndarray, roots: li
     )
 
     if roots:
-        root_y = [0.0] * len(roots) 
+        # Extract Er values from potential list of dicts (new format)
+        er_values = []
+        for r in roots:
+            if isinstance(r, dict) and "Er" in r:
+                er_values.append(r["Er"])
+            else:
+                er_values.append(r)
+        
+        root_y = [0.0] * len(er_values) 
         fig.add_trace(go.Scatter(
-            x=roots, 
+            x=np.array(er_values) / 1e3, 
             y=root_y, 
             mode='markers',
             name='Roots',
@@ -268,8 +301,8 @@ def plot_ambipolar_scan(erho_grid: np.ndarray, flux_diffs: np.ndarray, roots: li
         ))
 
     fig.update_layout(
-        title="Ambipolar Electric Field Search",
-        xaxis_title="Radial Electric Field E_rho [V/m]",
+        title=title,
+        xaxis_title="Radial Electric Field E_rho [kV/m]",
         yaxis_title="Net Radial Charge Flux [A/m^2]",
         template="plotly_white",
         hovermode="x unified"
