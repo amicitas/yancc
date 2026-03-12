@@ -1,4 +1,8 @@
 import numpy as np
+import json
+import yaml
+import datetime
+from pathlib import Path
 from scipy.optimize import brentq
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
@@ -9,6 +13,70 @@ from yancc.solve import solve_dke
 from yancc.field import Field
 
 logger = logging.getLogger(__name__)
+
+
+def generate_runid() -> str:
+    """
+    Generates a unique 20-character run ID based on date, time, 
+    Japanese era (Reiwa), and Zodiac symbol.
+    
+    Example: 260311-153045-R8-PIS
+    """
+    now = datetime.datetime.now()
+    
+    # Date/Time (6+1+6 = 13 chars)
+    dt_str = now.strftime("%y%m%d-%H%M%S")
+    
+    # Japanese Era (Reiwa) (2 chars)
+    reiwa_year = now.year - 2018
+    era_str = f"R{reiwa_year}"
+    
+    # Zodiac (3 chars)
+    day = now.day
+    month = now.month
+    if month == 1: zodiac = "CAP" if day < 20 else "AQU"
+    elif month == 2: zodiac = "AQU" if day < 19 else "PIS"
+    elif month == 3: zodiac = "PIS" if day < 21 else "ARI"
+    elif month == 4: zodiac = "ARI" if day < 20 else "TAU"
+    elif month == 5: zodiac = "TAU" if day < 21 else "GEM"
+    elif month == 6: zodiac = "GEM" if day < 21 else "CAN"
+    elif month == 7: zodiac = "CAN" if day < 23 else "LEO"
+    elif month == 8: zodiac = "LEO" if day < 23 else "VIR"
+    elif month == 9: zodiac = "VIR" if day < 23 else "LIB"
+    elif month == 10: zodiac = "LIB" if day < 23 else "SCO"
+    elif month == 11: zodiac = "SCO" if day < 22 else "SAG"
+    else: zodiac = "SAG" if day < 22 else "CAP"
+    
+    # 13 + 1 (dash) + 2 (era) + 1 (dash) + 3 (zodiac) = 20 chars
+    return f"{dt_str}-{era_str}-{zodiac}"
+
+
+def load_options(file_path: str) -> dict:
+    """Load options from a JSON or YAML file."""
+    path = Path(file_path)
+    if not path.exists():
+        raise FileNotFoundError(f"Options file not found: {file_path}")
+    
+    with open(path, 'r') as f:
+        if path.suffix in ('.yaml', '.yml'):
+            return yaml.safe_load(f)
+        elif path.suffix == '.json':
+            return json.load(f)
+        else:
+            raise ValueError(f"Unsupported file format: {path.suffix}. Use .json or .yaml")
+
+
+def save_options(options: dict, file_path: str):
+    """Save options to a JSON or YAML file."""
+    path = Path(file_path)
+    with open(path, 'w') as f:
+        if path.suffix in ('.yaml', '.yml'):
+            yaml.safe_dump(options, f, default_flow_style=False)
+        elif path.suffix == '.json':
+            json.dump(options, f, indent=4)
+        else:
+            raise ValueError(f"Unsupported file format: {path.suffix}. Use .json or .yaml")
+
 
 def calculate_net_charge_flux(erho: float, field, pitchgrid, speedgrid, species, **kwargs):
     """
@@ -27,21 +95,40 @@ def calculate_net_charge_flux(erho: float, field, pitchgrid, speedgrid, species,
     return float(net_charge_flux)
 
 
+def _merge_options(options: dict = None, **kwargs) -> dict:
+    """Merge options dictionary with keyword arguments."""
+    opts = options.copy() if options else {}
+    opts.update(kwargs)
+    return opts
+
+
 def find_ambipolar_roots(
         field,
         pitchgrid,
         speedgrid,
         species,
-        erho_min: float = -10000.0,
-        erho_max: float = 10000.0,
-        erho_num: int = 21,
-        show_plot: bool = False,
+        options: dict = None,
         rho: float = None,
         **kwargs
         ):
     """
     Scans a range of Erho values (sequentially) to bracket and find all roots
     where the net charge flux is zero.
+    
+    Parameters
+    ----------
+    field, pitchgrid, speedgrid, species : ...
+    options : dict, optional
+        Dictionary containing:
+        erho_min : float, default -10000.0
+        erho_max : float, default 10000.0
+        erho_num : int, default 21
+        show_plot : bool, default False
+        ... other DKE options
+    rho : float, optional
+        Radial label for logging/plotting.
+    **kwargs : 
+        Additional options to override or supplement the options dict.
     
     Returns
     -------
@@ -52,8 +139,17 @@ def find_ambipolar_roots(
     roots_detailed : list of dict
         List containing {"Er": float, "fluxes": dict} for each root found.
     """
+    opts = _merge_options(options, **kwargs)
+    erho_min = opts.get("erho_min", -10000.0)
+    erho_max = opts.get("erho_max", 10000.0)
+    erho_num = opts.get("erho_num", 21)
+    show_plot = opts.get("show_plot", False)
+
     logger.info(f"Finding ambipolar roots for rho={rho if rho is not None else 'unknown'}")
     erho_grid = np.linspace(erho_min, erho_max, erho_num)
+
+    # Filter out yancctools specific options before passing to solve_dke
+    dke_opts = {k: v for k, v in opts.items() if k not in ["erho_min", "erho_max", "erho_num", "show_plot"]}
 
     worker_func = partial(
         calculate_net_charge_flux,
@@ -61,7 +157,7 @@ def find_ambipolar_roots(
         pitchgrid=pitchgrid,
         speedgrid=speedgrid,
         species=species,
-        **kwargs
+        **dke_opts
     )
 
     # Coarse scan (serial)
@@ -86,7 +182,7 @@ def find_ambipolar_roots(
                 
                 # Retrieve full fluxes at the final root
                 _, _, fluxes, _ = solve_dke(
-                    field, pitchgrid, speedgrid, species, root_er, print_every=0, **kwargs
+                    field, pitchgrid, speedgrid, species, root_er, print_every=0, **dke_opts
                 )
                 
                 roots_detailed.append({
@@ -109,11 +205,14 @@ def find_ambipolar_roots(
     return erho_grid, flux_diffs, roots_detailed
 
 
-def _worker_rho_scan(rho, eq_type, eq_data, nt, nz, pitchgrid, speedgrid, global_species, erho_min, erho_max, erho_num, show_plots, **kwargs):
+def _worker_rho_scan(rho, eq_type, eq_data, pitchgrid, speedgrid, global_species, options: dict):
     """
     Worker function for radial scan. 
     Constructs the field and localizes species at a specific rho, then finds roots.
     """
+    nt = options.get("nt", 32)
+    nz = options.get("nz", 32)
+
     logger.info(f"Worker starting for rho={rho:.4f}")
     # 1. Reconstruct Field at this rho
     try:
@@ -137,8 +236,7 @@ def _worker_rho_scan(rho, eq_type, eq_data, nt, nz, pitchgrid, speedgrid, global
     # 3. Find roots
     _, _, roots_detailed = find_ambipolar_roots(
         field, pitchgrid, speedgrid, local_species, 
-        erho_min=erho_min, erho_max=erho_max, erho_num=erho_num,
-        show_plot=show_plots, rho=rho, **kwargs
+        options=options, rho=rho
     )
     
     logger.info(f"Worker finished for rho={rho:.4f}. Found {len(roots_detailed)} roots.")
@@ -149,42 +247,60 @@ def scan_ambipolar_profile(
         rho_grid: np.ndarray,
         eq_type: str,
         eq_data,
-        nt: int,
-        nz: int,
         pitchgrid,
         speedgrid,
         global_species,
-        erho_min: float = -10000.0,
-        erho_max: float = 10000.0,
-        erho_num: int = 21,
-        num_processors: int = 4,
-        show_plots: bool = True,
+        options: dict = None,
+        runid: str = None,
         **kwargs
         ):
     """
     Scans multiple radial surfaces in parallel to find ambipolar Erho profiles.
     
+    Parameters
+    ----------
+    rho_grid : np.ndarray
+        Array of radial surfaces to scan.
+    eq_type : str
+        Equilibrium type ("desc", "vmec", etc.)
+    eq_data : 
+        Equilibrium data object or file path.
+    pitchgrid, speedgrid, global_species : ...
+    options : dict, optional
+        Dictionary containing configuration options.
+    runid : str, optional
+        User-defined ID for this scan. If not given, a unique 20-char ID 
+        is generated automatically.
+    **kwargs :
+        Additional options to override or supplement the options dict.
+    
     Returns
     -------
     results : dict
-        A nested dictionary: { "rho_str": [ {"Er": float, "fluxes": dict}, ... ] }
+        A nested dictionary: { "rho_str": [ {"Er": float, "fluxes": dict}, ... ], "runid": str }
     """
-    logger.info(f"Starting radial scan over {len(rho_grid)} surfaces with {num_processors} processors...")
+    opts = _merge_options(options, **kwargs)
+    
+    if runid is None:
+        runid = opts.get("runid", generate_runid())
+    
+    # Save back to options dict
+    opts["runid"] = runid
+    if options is not None:
+        options["runid"] = runid
+
+    num_processors = opts.get("num_processors", 4)
+
+    logger.info(f"Starting radial scan (runid: {runid}) over {len(rho_grid)} surfaces with {num_processors} processors...")
     
     worker = partial(
         _worker_rho_scan,
         eq_type=eq_type,
         eq_data=eq_data,
-        nt=nt,
-        nz=nz,
         pitchgrid=pitchgrid,
         speedgrid=speedgrid,
         global_species=global_species,
-        erho_min=erho_min,
-        erho_max=erho_max,
-        erho_num=erho_num,
-        show_plots=show_plots,
-        **kwargs
+        options=opts
     )
 
     if num_processors > 1:
@@ -197,7 +313,8 @@ def scan_ambipolar_profile(
     scan_results.sort(key=lambda x: x[0])
     
     results = {f"{rho:.2f}": roots for rho, roots in scan_results}
-    logger.info("Radial scan complete.")
+    results["runid"] = runid
+    logger.info(f"Radial scan complete (runid: {runid}).")
     return results
 
 
@@ -206,7 +323,8 @@ def plot_ambipolar_profile(results: dict):
     Plots the radial profile of ambipolar electric fields in kV/m.
     """
     # Convert string keys back to floats for numerical plotting and sorting
-    rhos_numeric = sorted([float(r) for r in results.keys()])
+    # Skip metadata keys like 'runid'
+    rhos_numeric = sorted([float(r) for r in results.keys() if r != "runid"])
     
     root_sets = {0: [], 1: [], 2: []}
     rho_sets = {0: [], 1: [], 2: []}
