@@ -5,46 +5,37 @@ those generated with spincsscan and mirscan.
 Code generation utilized AI tools including:
   Gemini 3.1 pro
 """
-
 import numpy as np
 import plotly.graph_objects as go
 from io import StringIO
 
 
-def _read_and_clean_file(filepath):
+def _preprocess_profile_file(filepath):
     """
-    Private helper function to read the file, strip comments,
-    and return the data matrix as a numpy array.
+    Private helper function to read the file and strip comments.
 
-    Skips lines starting with '#', '!', or '%'.
-    Assumes the first valid line is a scalar header (e.g., '1')
-    and skips it to return only the coefficient matrix.
+    It removes lines starting with comment characters (#, !, %) and
+    returns a single string buffer suitable for np.loadtxt.
     """
     try:
         with open(filepath, 'r') as f:
             lines = f.readlines()
 
         # Filter out comments and empty lines
+        # context [1] indicates comments start with #, but we include ! and % for robustness
         clean_lines = [
             line for line in lines
             if line.strip() and not line.strip()[0] in ['#', '!', '%']
         ]
 
+        # We need at least 2 lines:
+        # Line 1: The scheme integer (e.g., "1")
+        # Line 2+: The coefficient matrix
         if len(clean_lines) < 2:
             return None
 
-        # The first clean line is the profile scheme integer (e.g., "1") [1].
-        # We skip it to get the coefficient matrix.
-        matrix_str = "".join(clean_lines[1:])
-
-        # Parse the string into a numpy array
-        data = np.loadtxt(StringIO(matrix_str))
-
-        # Ensure 2D array even if there is only one row of coeffs
-        if data.ndim == 1:
-            data = data.reshape(1, -1)
-
-        return data
+        # Skip the first line (scheme integer) and join the rest
+        return "\n".join(clean_lines[1:])
 
     except Exception as e:
         print(f"Error reading file: {e}")
@@ -53,10 +44,13 @@ def _read_and_clean_file(filepath):
 
 def generate_profile_functions(filepath):
     """
-    Generates a dictionary of polynomial functions from the input file.
+    Reads a profiles file where rows correspond to polynomial coefficients.
+    Returns a dictionary of callable functions.
 
-    Column Mapping (0-based):
-    Col 0-2: Ignored
+    The input file is pre-processed to remove comments and headers.
+
+    Column Mapping (0-based index):
+    Col 0-2: Ignored (NErs, generalEr_min, generalEr_max)
     Col 3: Species 1 Density
     Col 4: Species 1 Temperature
     Col 5: Species 2 Density
@@ -65,13 +59,25 @@ def generate_profile_functions(filepath):
 
     output_functions = {}
 
-    # 1. Get cleaned data matrix
-    data = _read_and_clean_file(filepath)
+    # --- 1. Preprocess File ---
+    clean_data_str = _preprocess_profile_file(filepath)
 
-    if data is None:
+    if clean_data_str is None:
+        print("Error: File could not be pre-processed or contains insufficient data.")
         return {}
 
-    # 2. Define Mapping
+    # --- 2. Load Data ---
+    try:
+        data = np.loadtxt(StringIO(clean_data_str))
+    except ValueError as e:
+        print(f"Error parsing data matrix: {e}")
+        return {}
+
+    # Handle case where there is only one row of coefficients (1D array -> 2D array)
+    if data.ndim == 1:
+        data = data.reshape(1, -1)
+
+    # --- 3. Map Columns to Functions ---
     column_map = {
         3: 'species_1_density',
         4: 'species_1_temperature',
@@ -79,24 +85,24 @@ def generate_profile_functions(filepath):
         6: 'species_2_temperature'
     }
 
-    # Validate dimensions
-    max_col = max(column_map.keys())
-    if data.shape[1] <= max_col:
-        print(f"Error: Data has {data.shape[1]} columns; expected at least {max_col + 1}.")
+    # Validate that the file has enough columns
+    max_needed_col = max(column_map.keys())
+    if data.shape[1] <= max_needed_col:
+        print(f"Error: File has {data.shape[1]} columns, but we need index {max_needed_col}.")
         return {}
 
-    # 3. Create Functions
     for col_idx, name in column_map.items():
+        # Extract the column. The rows are the coefficients c0, c1, c2...
         coeffs = data[:, col_idx]
 
-        # Closure to capture coefficients
+        # Create closure for the polynomial function
         def make_poly_func(coefficients):
-            # Enforce float type for safety
-            local_coeffs = np.array(coefficients, dtype=float)
+            # Capture coefficients in a local array to prevent late-binding issues
+            local_coeffs = np.array(coefficients)
 
             def poly_func(rN):
                 rN = np.atleast_1d(rN)
-                # Evaluates c0 + c1*x + c2*x^2 ...
+                # Evaluates: c0 + c1*x + c2*x^2 ...
                 return np.polynomial.polynomial.polyval(rN, local_coeffs)
 
             return poly_func
@@ -120,12 +126,9 @@ def plot_profiles_plotly(profile_dict):
     for name, func in profile_dict.items():
         y_vals = func(rN)
 
-        # Determine style based on name
-        is_temp = 'temperature' in name
-        is_spec1 = 'species_1' in name
-
-        line_dash = 'dash' if is_temp else 'solid'
-        color = 'blue' if is_spec1 else 'red'
+        # Style logic
+        line_dash = 'dash' if 'temperature' in name else 'solid'
+        color = 'blue' if 'species_1' in name else 'red'
 
         fig.add_trace(go.Scatter(
             x=rN,
@@ -136,17 +139,11 @@ def plot_profiles_plotly(profile_dict):
         ))
 
     fig.update_layout(
-        title="Polynomial Profiles (Reconstructed)",
+        title="Reconstructed Polynomial Profiles",
         xaxis_title="rN (Normalized Radius)",
         yaxis_title="Normalized Value",
         template="plotly_white",
         legend_title="Profile Type"
     )
+
     fig.show()
-
-
-# --- Execution ---
-target_file = '/u/npablant/analysis/w7x/171207006/stelltran/run07/sfincs/t2.2273/profiles'
-
-profiles_map = generate_profile_functions(target_file)
-plot_profiles_plotly(profiles_map)
