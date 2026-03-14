@@ -6,6 +6,7 @@ Code generation utilized AI tools including:
   Gemini 3.1 pro
 """
 import numpy as np
+import jax.numpy as jnp
 import plotly.graph_objects as go
 from io import StringIO
 
@@ -98,12 +99,12 @@ def generate_profile_functions(filepath):
         # Create closure for the polynomial function
         def make_poly_func(coefficients):
             # Capture coefficients in a local array to prevent late-binding issues
-            local_coeffs = np.array(coefficients)
+            # We reverse them because jnp.polyval expects descending order [c_n, ..., c_0]
+            local_coeffs = jnp.array(coefficients[::-1])
 
             def poly_func(rN):
-                rN = np.atleast_1d(rN)
-                # Evaluates: c0 + c1*x + c2*x^2 ...
-                return np.polynomial.polynomial.polyval(rN, local_coeffs)
+                # Evaluates: c0 + c1*x + c2*x^2 ... using JAX
+                return jnp.polyval(local_coeffs, rN)
 
             return poly_func
 

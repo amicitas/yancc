@@ -15,7 +15,6 @@ import yaml
 import datetime
 from pathlib import Path
 from scipy.optimize import brentq
-from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -29,15 +28,13 @@ logger = logging.getLogger(__name__)
 
 def generate_runid() -> str:
     """
-    Generates a unique 20-character run ID based on date, time, 
-    Japanese era (Reiwa), and Zodiac symbol.
+    Generates a unique 20-character run ID based on Japanese era (Reiwa), 
+    Zodiac symbol, date, and time.
     
-    Example: 260311-153045-R8-PIS
+    Format: Era-Zodiac-YYMMDD-HHMMSS (20 characters)
+    Example: R8-PIS-260311-153045
     """
     now = datetime.datetime.now()
-    
-    # Date/Time (6+1+6 = 13 chars)
-    dt_str = now.strftime("%y%m%d-%H%M%S")
     
     # Japanese Era (Reiwa) (2 chars)
     reiwa_year = now.year - 2018
@@ -59,8 +56,11 @@ def generate_runid() -> str:
     elif month == 11: zodiac = "SCO" if day < 22 else "SAG"
     else: zodiac = "SAG" if day < 22 else "CAP"
     
-    # 13 + 1 (dash) + 2 (era) + 1 (dash) + 3 (zodiac) = 20 chars
-    return f"{dt_str}-{era_str}-{zodiac}"
+    # Date/Time (6+1+6 = 13 chars)
+    dt_str = now.strftime("%y%m%d-%H%M%S")
+    
+    # 2 (era) + 1 (dash) + 3 (zodiac) + 1 (dash) + 13 (dt) = 20 chars
+    return f"{era_str}-{zodiac}-{dt_str}"
 
 
 def load_options(file_path: str) -> dict:
@@ -268,7 +268,7 @@ def scan_ambipolar_profile(
         **kwargs
         ):
     """
-    Scans multiple radial surfaces in parallel to find ambipolar Erho profiles.
+    Scans multiple radial surfaces sequentially to find ambipolar Erho profiles.
     
     Parameters
     ----------
@@ -310,9 +310,7 @@ def scan_ambipolar_profile(
     if options is not None:
         options["runid"] = runid
 
-    num_processors = opts.get("num_processors", 4)
-
-    logger.info(f"Starting radial scan (runid: {runid}) over {len(rho_grid)} surfaces with {num_processors} processors...")
+    logger.info(f"Starting radial scan (runid: {runid}) over {len(rho_grid)} surfaces (sequential execution)...")
     
     worker = partial(
         _worker_rho_scan,
@@ -324,11 +322,8 @@ def scan_ambipolar_profile(
         options=opts
     )
 
-    if num_processors > 1:
-        with ProcessPoolExecutor(num_processors) as executor:
-            scan_results = list(executor.map(worker, rho_grid))
-    else:
-        scan_results = [worker(rho) for rho in rho_grid]
+    # Run sequentially to avoid pickling issues with JAX/lambdas in notebooks
+    scan_results = [worker(rho) for rho in rho_grid]
 
     # Sort results by rho
     scan_results.sort(key=lambda x: x[0])

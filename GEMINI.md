@@ -8,6 +8,8 @@
 --  Output dictionaries should be compatible with hdf5 whenever possible
 - **Run Tracking:** All batch or radial scans must include a unique `runid` (20-character format: `Era-Zodiac-YYMMDD-HHMMSS`).
 - **Logging:** Ensure `logging` is configured and visible in all execution environments, including Jupyter notebooks.
+- **AI Usage Disclaimer**  At the top of every file that is modified by an AI tool, add a disclaimer saying 'This file includes AI generated code' and the course identifier eg. Gemini 3.1 pro
+-- When new functions or methods are entirely generated through an AI tool, put a similar appropriate disclaimer in the doc string.
 
 ## Coding Standards
 - Use Python 3.10+ features (e.g., modern type hinting).
