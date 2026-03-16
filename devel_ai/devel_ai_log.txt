@@ -1,9 +1,23 @@
-This file includes AI generated code (Gemini 2.0 Pro)
+This file includes AI generated code (Gemini)
 
 # Development Log - AI Coding Sessions
 
-2026-03-15: Initial setup
+2026-03-15: Initial setup & Session Logging Mandate
 - Created 'devel_ai' directory.
 - Created 'features_request.md' for feature tracking.
 - Created 'devel_ai_log.txt' for session logging.
 - Updated 'GEMINI.md' to include a new mandate for providing full diffs.
+- Researched PyCharm plugin diff shortcut: `Ctrl + O` (letter 'O') for expanding/collapsing diffs.
+- Updated 'GEMINI.md' to include a mandate for automatic session logging to 'devel_ai/devel_ai_log.txt' when the user says "thank you" or closes the session.
+
+2026-03-16: Better I/O & Run Handling
+- Created `yancctools_io.py` to centralize I/O for options (JSON/YAML), inputs (HDF5), and results (HDF5).
+- Refactored `yancctools.py` and `__init__.py` to use `yancctools_io.py`.
+- Developed "Part 3" notebook (`2026-03-16 - Development of tools... - Part 3 - radial scan IO.ipynb`) focusing on radial scan I/O and data reloading.
+- Created `yancctools_tests.py` for automated minimal testing of the radial scan + I/O workflow (using `ai_test_` run IDs).
+- Simplified AI identifiers in headers/logs to just 'Gemini'.
+- Updated `GEMINI.md` to clarify the AI Usage Disclaimer format.
+- Bug Fixes:
+  - Fixed `ImportError` in `yancctools.__init__`.
+  - Filtered out `output_path` in `yancctools.py` to prevent `solve_dke` failures.
+  - Fixed `date11time` typo in `yancctools.py`.

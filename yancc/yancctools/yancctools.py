@@ -4,14 +4,12 @@ Some tools to help with running performance scans in parameters:
  - Profile scans over rho
 
 Code generation heavily utilized AI coding agenents including:
-  Gemini 3.1 pro
+  Gemini
 Please be careful in using this code and YMMV.
 """
 
 
 import numpy as np
-import json
-import yaml
 import datetime
 from pathlib import Path
 from scipy.optimize import brentq
@@ -59,33 +57,6 @@ def generate_runid() -> str:
     
     # 2 (era) + 1 (dash) + 3 (zodiac) + 1 (dash) + 13 (dt) = 20 chars
     return f"{era_str}-{zodiac}-{dt_str}"
-
-
-def load_options(file_path: str) -> dict:
-    """Load options from a JSON or YAML file."""
-    path = Path(file_path)
-    if not path.exists():
-        raise FileNotFoundError(f"Options file not found: {file_path}")
-    
-    with open(path, 'r') as f:
-        if path.suffix in ('.yaml', '.yml'):
-            return yaml.safe_load(f)
-        elif path.suffix == '.json':
-            return json.load(f)
-        else:
-            raise ValueError(f"Unsupported file format: {path.suffix}. Use .json or .yaml")
-
-
-def save_options(options: dict, file_path: str):
-    """Save options to a JSON or YAML file."""
-    path = Path(file_path)
-    with open(path, 'w') as f:
-        if path.suffix in ('.yaml', '.yml'):
-            yaml.safe_dump(options, f, default_flow_style=False)
-        elif path.suffix == '.json':
-            json.dump(options, f, indent=4)
-        else:
-            raise ValueError(f"Unsupported file format: {path.suffix}. Use .json or .yaml")
 
 
 def calculate_net_charge_flux(erho: float, field, pitchgrid, speedgrid, species, **kwargs):
@@ -159,7 +130,7 @@ def find_ambipolar_roots(
     erho_grid = np.linspace(erho_min, erho_max, erho_num)
 
     # Filter out yancctools specific options before passing to solve_dke
-    yancctools_keys = ["erho_min", "erho_max", "erho_num", "show_plot", "nt", "nz", "num_processors", "runid"]
+    yancctools_keys = ["erho_min", "erho_max", "erho_num", "show_plot", "nt", "nz", "num_processors", "runid", "output_path"]
     dke_opts = {k: v for k, v in opts.items() if k not in yancctools_keys}
 
     worker_func = partial(

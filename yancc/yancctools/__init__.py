@@ -9,11 +9,18 @@
 #    I am using GeminiCLI v3 around 2026-03
 
 from .yancctools import (
-    load_options,
-    save_options,
     calculate_net_charge_flux,
     find_ambipolar_roots,
     scan_ambipolar_profile,
+)
+
+from .yancctools_io import (
+    load_options,
+    save_options,
+    load_inputs,
+    save_inputs,
+    load_results,
+    save_results,
 )
 
 from .yancctools_plot import (
