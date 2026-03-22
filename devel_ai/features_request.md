@@ -11,3 +11,4 @@
 | - Notebook "Part 3" development | 2026-03-16 | Done | Focus on radial scans, ambipolar solutions, and file-based plotting (re-loading data). |
 | **Improve scan_ambipolar_profile output** | 2026-03-21 | **Done** | Refactored results to be HDF5-compatible list of dicts (`scan_results`), including full options. |
 | **AI assisted development tracking** | 2026-03-15 | Done | Created `devel_ai` directory and initial logs. |
+| **Automated convergence scan tool** | 2026-03-22 | **Done** | Implement convergence scan tool iterating over numerical resolution parameters, including tracking particle fluxes, HDF5 output, and Plotly visualizations. |

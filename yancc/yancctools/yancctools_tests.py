@@ -137,5 +137,67 @@ def test_radial_scan_io():
         
         logger.info("Test passed successfully.")
 
+
+
+def test_convergence_scan():
+    """
+    Test convergence scan execution.
+    - Runs a minimal scan.
+    - Verifies output format and structure.
+    """
+    options = {
+        "nt": 7,
+        "nz": 7,
+        "nx": 5,
+        "na": 9,
+        "rtol": 1e-2,
+        "convergence_scan_steps": 2
+    }
+    
+    def density(r): return 1e20 * (1 - r**2)
+    def temp_e(r): return 3e3 * (1 - r**2)
+    
+    global_species = [
+        GlobalMaxwellian(yancc.species.Electron, temperature=temp_e, density=density)
+    ]
+    
+    try:
+        eq = desc.examples.get("W7-X")
+    except Exception as e:
+        pytest.skip(f"Skipping test: Could not load W7-X equilibrium: {e}")
+        return
+
+    from yancc.yancctools.yancctools_convergence import run_convergence_scan
+    
+    runid = f"test_conv_{uuid.uuid4().hex[:8]}"
+    
+    results = run_convergence_scan(
+        eq_type="desc",
+        eq_data=eq,
+        global_species=global_species,
+        rho=0.5,
+        erho=0.0,
+        options=options,
+        runid=runid
+    )
+    
+    assert results["runid"] == runid
+    assert "scan_results" in results
+    
+    scan_results = results["scan_results"]
+    assert "nx" in scan_results
+    assert "na" in scan_results
+    assert "nt" in scan_results
+    assert "nz" in scan_results
+    
+    # We requested convergence_scan_steps=2, so we might get 1-2 points depending on logic and bounds
+    assert len(scan_results["nx"]) >= 1
+    assert "particle_flux" in scan_results["nx"][0]
+    
+    # There is 1 species, so particle_flux should be a list of 1 element
+    assert len(scan_results["nx"][0]["particle_flux"]) == 1
+
+
 if __name__ == "__main__":
     test_radial_scan_io()
+    test_convergence_scan()

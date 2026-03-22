@@ -23,8 +23,11 @@ from .yancctools_io import (
     save_results,
 )
 
+from .yancctools_convergence import run_convergence_scan
+
 from .yancctools_plot import (
     plot_ambipolar_scan,
     plot_ambipolar_profile,
     plot_ambipolar_summary,
+    plot_convergence_scan,
 )

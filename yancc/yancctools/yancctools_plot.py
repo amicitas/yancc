@@ -252,3 +252,68 @@ def plot_ambipolar_scan(erho_grid: np.ndarray, flux_diffs: np.ndarray, roots: li
     )
 
     fig.show()
+
+
+def plot_convergence_scan(results: dict):
+    """
+    Plots the results of a convergence scan.
+    
+    This function was entirely generated through an AI tool (Gemini).
+    """
+    scan_results = results.get("scan_results", {})
+    runid = results.get("runid", "Unknown Run")
+    
+    params = list(scan_results.keys())
+    num_params = len(params)
+    
+    if num_params == 0:
+        print("No convergence scan data to plot.")
+        return
+        
+    cols = 2
+    rows = (num_params + 1) // 2
+    if rows == 0: rows = 1
+    
+    fig = make_subplots(
+        rows=rows, cols=cols,
+        subplot_titles=[f"{p} Convergence" for p in params]
+    )
+    
+    for i, param in enumerate(params):
+        row = (i // cols) + 1
+        col = (i % cols) + 1
+        
+        data = scan_results[param]
+        if not data:
+            continue
+            
+        x_vals = [d["value"] for d in data]
+        
+        # Assuming all entries have the same number of species
+        num_species = len(data[0]["particle_flux"])
+        
+        for sp_idx in range(num_species):
+            y_vals = [d["particle_flux"][sp_idx] for d in data]
+            fig.add_trace(
+                go.Scatter(
+                    x=x_vals,
+                    y=y_vals,
+                    mode="lines+markers",
+                    name=f"Species {sp_idx} Flux",
+                    legendgroup=f"Species {sp_idx}",
+                    showlegend=(i == 0) # Only show legend once
+                ),
+                row=row, col=col
+            )
+            
+        fig.update_xaxes(title_text=f"{param}", row=row, col=col)
+        fig.update_yaxes(title_text="Particle Flux", row=row, col=col)
+        
+    fig.update_layout(
+        title_text=f"Convergence Scan Results (RunID: {runid})",
+        height=max(400, 400 * rows),
+        width=900,
+        showlegend=True
+    )
+    
+    fig.show()

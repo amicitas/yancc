@@ -34,3 +34,25 @@ Updated features_request.md and GEMINI.md feature tracking instructions.
 - Changed options handling from a negative filter (dropping known yancctools options) to a positive filter (extracting only explicitly known `solve_dke` options like `p1`, `p2`, `rtol`, etc.).
 - Added the required `This file includes AI generated code (Gemini)` disclaimer to `yancctools.py`.
 - Verified changes by successfully running `pytest yancc/yancctools/yancctools_tests.py`.
+
+--- Session Log: 2026-03-22 (Convergence Scan Tool) ---
+Implemented the automated convergence scan tool based on the plan in `temp/convergence_scan_plan.md`.
+
+1. `yancc/yancctools/yancctools_convergence.py`:
+   - Created the module with the `run_convergence_scan` function to automatically orchestrate scans over numerical parameters (`nx`, `na`, `nt`, `nz`).
+   - The scan iterates across odd integer resolutions (starting from a minimum of 5) stepping backwards to roughly -50% and up to +100% of nominal values. 
+   - Tracking is enabled through standard `runid` functionality, and metrics tracked during each `solve_dke` step are aggregated under HDF5 compatible dictionaries (tracking the resulting `<particle_flux>`).
+
+2. `yancc/yancctools/yancctools_plot.py`:
+   - Implemented `plot_convergence_scan` using Plotly to plot multi-panel convergence charts. It displays the convergence tracks of particle fluxes for all scanned parameters inside a single interactive dashboard.
+
+3. `yancc/yancctools/__init__.py` & Tests:
+   - Exported the newly created functions.
+   - Added a `test_convergence_scan` unit test in `yancc/yancctools/yancctools_tests.py` verifying functionality at minimal resolutions. All tests ran and successfully passed.
+
+4. Demonstration Notebook:
+   - Generated `notebooks/2026-03-22 - Development of tools to help with comparison of yancc to sfincs - Part 5 - convergence scan.ipynb`.
+   - Outlines how to initialize an equilibrium, set species density/temperatures, define the baseline options, run the convergence scan, output metrics, and plot.
+
+5. `devel_ai/features_request.md`:
+   - Updated the convergence scan feature entry to "Done".
