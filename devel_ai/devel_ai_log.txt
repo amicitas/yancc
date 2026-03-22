@@ -28,3 +28,9 @@ Updated yancctools_tests.py to reflect new structure.
 Created notebooks/2026-03-21 - Development of tools to help with comparison of yancc to sfincs - Part 4 - radial scan IO.ipynb.
 
 Updated features_request.md and GEMINI.md feature tracking instructions.
+
+--- Session Log: 2026-03-22 ---
+- Fixed a kwargs handling bug in `yancctools.py` where `solve_dke` failed due to unexpected arguments like `nx` and `na`.
+- Changed options handling from a negative filter (dropping known yancctools options) to a positive filter (extracting only explicitly known `solve_dke` options like `p1`, `p2`, `rtol`, etc.).
+- Added the required `This file includes AI generated code (Gemini)` disclaimer to `yancctools.py`.
+- Verified changes by successfully running `pytest yancc/yancctools/yancctools_tests.py`.

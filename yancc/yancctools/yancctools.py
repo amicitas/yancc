@@ -3,8 +3,7 @@ Some tools to help with running performance scans in parameters:
  - Ambipolar solover for Er
  - Profile scans over rho
 
-Code generation heavily utilized AI coding agenents including:
-  Gemini
+This file includes AI generated code (Gemini)
 Please be careful in using this code and YMMV.
 """
 
@@ -129,9 +128,13 @@ def find_ambipolar_roots(
     logger.info(f"Finding ambipolar roots for rho={rho if rho is not None else 'unknown'}")
     erho_grid = np.linspace(erho_min, erho_max, erho_num)
 
-    # Filter out yancctools specific options before passing to solve_dke
-    yancctools_keys = ["erho_min", "erho_max", "erho_num", "show_plot", "nt", "nz", "num_processors", "runid", "output_path"]
-    dke_opts = {k: v for k, v in opts.items() if k not in yancctools_keys}
+    # Extract only the keys needed by solve_dke
+    dke_keys = [
+        "p1", "p2", "rtol", "atol", "m", "k", "maxiter", "print_every",
+        "operator_weights", "nL", "quad", "skip_init_print", "potentials",
+        "M", "B", "C", "U", "f1"
+    ]
+    dke_opts = {k: v for k, v in opts.items() if k in dke_keys}
 
     worker_func = partial(
         calculate_net_charge_flux,

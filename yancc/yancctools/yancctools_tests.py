@@ -44,6 +44,8 @@ def test_radial_scan_io():
             "erho_num": 5,      # Minimal points for coarse scan
             "nt": 9,            # Minimal resolution
             "nz": 9,
+            "nx": 5,
+            "na": 17,
             "rtol": 1e-3,
             "num_processors": 1 # Serial execution for test
         }
@@ -69,8 +71,8 @@ def test_radial_scan_io():
 
         # 4. Minimal Grids
         rho_grid = np.array([0.5])
-        speedgrid = MaxwellSpeedGrid(nx=5)
-        pitchgrid = UniformPitchAngleGrid(nxi=17)
+        speedgrid = MaxwellSpeedGrid(nx=options['nx'])
+        pitchgrid = UniformPitchAngleGrid(nxi=options['na'])
         
         # 5. Unique Test RunID
         runid = f"ai_test_{uuid.uuid4().hex[:8]}"
