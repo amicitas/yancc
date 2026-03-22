@@ -9,4 +9,5 @@
 | - Standardized radial scan I/O | 2026-03-16 | Done | Functions to write results and options to run-specific directories. |
 | - Run management with `runid` | 2026-03-16 | Done | Automatic directory creation using `Era-Zodiac-YYMMDD-HHMMSS` format inside `output_path`. |
 | - Notebook "Part 3" development | 2026-03-16 | Done | Focus on radial scans, ambipolar solutions, and file-based plotting (re-loading data). |
+| **Improve scan_ambipolar_profile output** | 2026-03-21 | **Done** | Refactored results to be HDF5-compatible list of dicts (`scan_results`), including full options. |
 | **AI assisted development tracking** | 2026-03-15 | Done | Created `devel_ai` directory and initial logs. |

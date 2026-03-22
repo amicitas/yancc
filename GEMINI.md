@@ -14,7 +14,10 @@
     - When new functions or methods are entirely generated through an AI tool, put a similar appropriate disclaimer in the doc string.
 - **Full Diffs:** When asking for permission to modify files, always show the full diff instead of only the first few lines.
 - **Session Logging:** When the user asks to close a session or says "thank you", write a summary of the current session's changes and key findings to `devel_ai/devel_ai_log.txt`.
-- **Feature Requests:** When the user asks for a new feature, add it to `devel_ai/features_request.md`.
+- **Feature Requests:**
+    - **Creation:** Upon identifying a new feature or significant change request, immediately add it to `devel_ai/features_request.md` with the current date and "Pending" status.
+    - **Alignment:** Before creating a plan, verify alignment with `devel_ai/features_request.md`. If the task is new, create a tracking entry first.
+    - **Completion:** Upon successful implementation and verification, update the status to "Done" in `devel_ai/features_request.md` and include a brief note on the implementation details.
 
 ## Coding Standards
 - Use Python 3.10+ features (e.g., modern type hinting).

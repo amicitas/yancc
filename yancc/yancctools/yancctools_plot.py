@@ -15,15 +15,16 @@ def plot_ambipolar_profile(results: dict):
     """
     # Convert string keys back to floats for numerical plotting and sorting
     # Skip metadata keys like 'runid'
-    rhos_numeric = sorted([float(r) for r in results.keys() if r != "runid"])
+    scan_data = results.get("scan_results", [])
+    # Sort by rho just in case
+    scan_data.sort(key=lambda x: x["rho"])
     
     root_sets = {0: [], 1: [], 2: []}
     rho_sets = {0: [], 1: [], 2: []}
     
-    for r_num in rhos_numeric:
-        r_str = f"{r_num:.2f}"
+    for data in scan_data:
+        r_num = data["rho"]
         # Extract Er values from the nested detailed roots (new structure)
-        data = results[r_str]
         detailed_roots = data.get("roots", [])
         
         # Roots are already sorted by Er in find_ambipolar_roots
@@ -80,7 +81,8 @@ def plot_ambipolar_summary(results: dict, global_species: list = None):
     This method was entirely generated through an AI tool (Gemini 3.5 Sonnet).
     """
     runid = results.get("runid", "unknown")
-    rhos_numeric = sorted([float(r) for r in results.keys() if r != "runid"])
+    scan_data = results.get("scan_results", [])
+    scan_data.sort(key=lambda x: x["rho"])
     
     # Create subplots: 2 rows, 2 columns
     fig = make_subplots(
@@ -118,9 +120,9 @@ def plot_ambipolar_summary(results: dict, global_species: list = None):
 
     # 2. Plot all flux scans
     # Use a colormap for different rhos
-    for i, r_num in enumerate(rhos_numeric):
+    for i, data in enumerate(scan_data):
+        r_num = data["rho"]
         r_str = f"{r_num:.2f}"
-        data = results[r_str]
         er_grid = data["erho_grid"]
         fl_diffs = data["flux_diffs"]
         roots = data["roots"]
@@ -151,9 +153,9 @@ def plot_ambipolar_summary(results: dict, global_species: list = None):
     # 3. Plot final Er profile
     root_sets = {0: [], 1: [], 2: []}
     rho_sets = {0: [], 1: [], 2: []}
-    for r_num in rhos_numeric:
-        r_str = f"{r_num:.2f}"
-        detailed_roots = results[r_str]["roots"]
+    for data in scan_data:
+        r_num = data["rho"]
+        detailed_roots = data.get("roots", [])
         er_values = [rd["Er"] for rd in detailed_roots]
         
         if len(er_values) == 1:

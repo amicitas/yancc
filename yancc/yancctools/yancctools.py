@@ -288,18 +288,25 @@ def scan_ambipolar_profile(
     )
 
     # Run sequentially to avoid pickling issues with JAX/lambdas in notebooks
-    scan_results = [worker(rho) for rho in rho_grid]
+    scan_results_list = [worker(rho) for rho in rho_grid]
 
     # Sort results by rho
-    scan_results.sort(key=lambda x: x[0])
+    scan_results_list.sort(key=lambda x: x[0])
     
+    # Construct results dictionary in the new HDF5-friendly format
     results = {
-        f"{rho:.2f}": {
-            "roots": roots,
-            "erho_grid": er_grid,
-            "flux_diffs": fl_diffs
-        } for rho, roots, er_grid, fl_diffs in scan_results
+        "runid": runid,
+        "options": opts,
+        "scan_results": [
+            {
+                "rho": rho,
+                "roots": roots,
+                "erho_grid": er_grid,
+                "flux_diffs": fl_diffs
+            }
+            for rho, roots, er_grid, fl_diffs in scan_results_list
+        ]
     }
-    results["runid"] = runid
+
     logger.info(f"Radial scan complete (runid: {runid}).")
     return results

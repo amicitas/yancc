@@ -21,3 +21,10 @@ This file includes AI generated code (Gemini)
   - Fixed `ImportError` in `yancctools.__init__`.
   - Filtered out `output_path` in `yancctools.py` to prevent `solve_dke` failures.
   - Fixed `date11time` typo in `yancctools.py`.
+--- Session Log: Sat Mar 21 22:23:33 EDT 2026 ---
+Updated scan_ambipolar_profile to return HDF5-compatible list structure (scan_results) instead of rho-keyed dict.
+Updated yancctools_plot.py to iterate over scan_results.
+Updated yancctools_tests.py to reflect new structure.
+Created notebooks/2026-03-21 - Development of tools to help with comparison of yancc to sfincs - Part 4 - radial scan IO.ipynb.
+
+Updated features_request.md and GEMINI.md feature tracking instructions.

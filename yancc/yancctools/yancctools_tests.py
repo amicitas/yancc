@@ -91,7 +91,8 @@ def test_radial_scan_io():
         
         # Assertions on RunID
         assert results['runid'] == runid
-        assert '0.50' in results
+        assert len(results['scan_results']) == 1
+        assert abs(results['scan_results'][0]['rho'] - 0.5) < 1e-5
         
         # 7. I/O Validation
         run_dir = temp_path / runid
@@ -121,13 +122,15 @@ def test_radial_scan_io():
         assert loaded_options['erho_num'] == 5
         assert loaded_inputs['test_key'] == "test_value"
         assert loaded_results['runid'] == runid
-        assert '0.50' in loaded_results
         
         # Verify numerical data (approx)
         # Check that erho_grid in loaded results matches original
+        scan_res_orig = results['scan_results'][0]
+        scan_res_loaded = loaded_results['scan_results'][0]
+        
         np.testing.assert_allclose(
-            loaded_results['0.50']['erho_grid'], 
-            results['0.50']['erho_grid']
+            scan_res_loaded['erho_grid'], 
+            scan_res_orig['erho_grid']
         )
         
         logger.info("Test passed successfully.")
