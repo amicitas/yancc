@@ -23,7 +23,7 @@ from .yancctools_io import (
     save_results,
 )
 
-from .yancctools_convergence import run_convergence_scan
+from .yancctools_convergence import identify_species_name, run_convergence_scan
 
 from .yancctools_plot import (
     plot_ambipolar_scan,

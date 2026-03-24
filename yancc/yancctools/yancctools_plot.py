@@ -1,4 +1,4 @@
-# This file includes AI generated code: Gemini 3.5 Sonnet
+# This file includes AI generated code (Gemini/Claude)
 """
 Plotting routines for yancctools.
 """
@@ -254,66 +254,205 @@ def plot_ambipolar_scan(erho_grid: np.ndarray, flux_diffs: np.ndarray, roots: li
     fig.show()
 
 
-def plot_convergence_scan(results: dict):
+def plot_convergence_scan(results: dict, show: bool = True):
     """
-    Plots the results of a convergence scan.
-    
-    This function was entirely generated through an AI tool (Gemini).
+    Plot convergence scan results with absolute flux and percent deviation.
+
+    For each scanned parameter (nx, na, nt, nz), two subplots are shown
+    side by side: the left shows absolute particle flux values, the right
+    shows percent deviation relative to the flux at the nominal resolution.
+    A vertical dashed line marks the nominal value on each subplot.
+
+    This function was entirely generated through an AI tool (Claude).
+
+    Parameters
+    ----------
+    results : dict
+        Output dictionary from ``run_convergence_scan``, containing keys
+        ``scan_results``, ``runid``, ``species_names``, and
+        ``nominal_values``.
+    show : bool, optional
+        If True (default), call ``fig.show()``. The figure is always
+        returned regardless of this setting.
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        The Plotly figure object.
     """
     scan_results = results.get("scan_results", {})
     runid = results.get("runid", "Unknown Run")
-    
+    species_names = results.get("species_names", None)
+    nominal_values = results.get("nominal_values", {})
+    rho = results.get("rho", None)
+    erho = results.get("erho", None)
+
     params = list(scan_results.keys())
     num_params = len(params)
-    
+
     if num_params == 0:
         print("No convergence scan data to plot.")
-        return
-        
+        return None
+
+    # Layout: one row per parameter, two columns (absolute | deviation)
+    rows = num_params
     cols = 2
-    rows = (num_params + 1) // 2
-    if rows == 0: rows = 1
-    
+
+    subplot_titles = []
+    for p in params:
+        nom = nominal_values.get(p)
+        nom_str = f" (nominal={nom})" if nom is not None else ""
+        subplot_titles.append(f"{p} — Particle Flux{nom_str}")
+        subplot_titles.append(f"{p} — Deviation from Nominal{nom_str}")
+
     fig = make_subplots(
-        rows=rows, cols=cols,
-        subplot_titles=[f"{p} Convergence" for p in params]
+        rows=rows,
+        cols=cols,
+        subplot_titles=subplot_titles,
+        horizontal_spacing=0.12,
+        vertical_spacing=0.08,
     )
-    
+
+    # Default color sequence for species
+    _colors = [
+        "royalblue",
+        "crimson",
+        "seagreen",
+        "darkorange",
+        "mediumpurple",
+        "goldenrod",
+        "deeppink",
+        "teal",
+    ]
+
     for i, param in enumerate(params):
-        row = (i // cols) + 1
-        col = (i % cols) + 1
-        
+        row = i + 1
+
         data = scan_results[param]
         if not data:
             continue
-            
+
         x_vals = [d["value"] for d in data]
-        
-        # Assuming all entries have the same number of species
         num_species = len(data[0]["particle_flux"])
-        
+        nominal_val = nominal_values.get(param)
+
+        # Find the flux values at the nominal resolution for deviation calc.
+        # Use exact match first; fall back to linear interpolation if the
+        # nominal value was not included in the scan points.
+        nominal_fluxes = None
+        if nominal_val is not None:
+            for d in data:
+                if int(d["value"]) == int(nominal_val):
+                    nominal_fluxes = d["particle_flux"]
+                    break
+
+            if nominal_fluxes is None and len(data) >= 2:
+                # Interpolate flux at the nominal value
+                x_arr = np.array([d["value"] for d in data], dtype=float)
+                nominal_fluxes = []
+                for sp_idx in range(num_species):
+                    y_arr = np.array(
+                        [d["particle_flux"][sp_idx] for d in data], dtype=float
+                    )
+                    nominal_fluxes.append(
+                        float(np.interp(float(nominal_val), x_arr, y_arr))
+                    )
+
         for sp_idx in range(num_species):
+            # Determine species label
+            if species_names and sp_idx < len(species_names):
+                sp_name = species_names[sp_idx]
+            else:
+                sp_name = f"Species {sp_idx}"
+
+            color = _colors[sp_idx % len(_colors)]
             y_vals = [d["particle_flux"][sp_idx] for d in data]
+
+            # Left column: absolute flux values
             fig.add_trace(
                 go.Scatter(
                     x=x_vals,
                     y=y_vals,
                     mode="lines+markers",
-                    name=f"Species {sp_idx} Flux",
-                    legendgroup=f"Species {sp_idx}",
-                    showlegend=(i == 0) # Only show legend once
+                    name=sp_name,
+                    legendgroup=sp_name,
+                    showlegend=(i == 0),
+                    line=dict(color=color, width=2),
+                    marker=dict(size=6),
                 ),
-                row=row, col=col
+                row=row,
+                col=1,
             )
-            
-        fig.update_xaxes(title_text=f"{param}", row=row, col=col)
-        fig.update_yaxes(title_text="Particle Flux", row=row, col=col)
-        
+
+            # Right column: percent deviation from nominal
+            if nominal_fluxes is not None:
+                ref = nominal_fluxes[sp_idx]
+                if ref != 0.0:
+                    dev_vals = [(v - ref) / abs(ref) * 100.0 for v in y_vals]
+                else:
+                    dev_vals = [0.0] * len(y_vals)
+
+                fig.add_trace(
+                    go.Scatter(
+                        x=x_vals,
+                        y=dev_vals,
+                        mode="lines+markers",
+                        name=sp_name,
+                        legendgroup=sp_name,
+                        showlegend=False,
+                        line=dict(color=color, width=2),
+                        marker=dict(size=6),
+                    ),
+                    row=row,
+                    col=2,
+                )
+
+        # Add nominal value vertical line on both columns
+        if nominal_val is not None:
+            for col_idx in [1, 2]:
+                fig.add_vline(
+                    x=nominal_val,
+                    line_dash="dash",
+                    line_color="gray",
+                    line_width=1.5,
+                    row=row,
+                    col=col_idx,
+                )
+
+        # Add zero reference line on deviation column
+        fig.add_hline(
+            y=0,
+            line_dash="dot",
+            line_color="gray",
+            line_width=1,
+            row=row,
+            col=2,
+        )
+
+        # Axis labels
+        fig.update_xaxes(title_text=param, row=row, col=1)
+        fig.update_xaxes(title_text=param, row=row, col=2)
+        fig.update_yaxes(title_text="Particle Flux", row=row, col=1)
+        fig.update_yaxes(title_text="Deviation [%]", row=row, col=2)
+
+    # Build title
+    title_parts = [f"Convergence Scan (RunID: {runid})"]
+    if rho is not None:
+        title_parts.append(f"rho={rho:.4f}")
+    if erho is not None:
+        title_parts.append(f"Erho={erho:.2e} V/m")
+    title = " | ".join(title_parts)
+
     fig.update_layout(
-        title_text=f"Convergence Scan Results (RunID: {runid})",
-        height=max(400, 400 * rows),
-        width=900,
-        showlegend=True
+        title_text=title,
+        height=max(400, 350 * rows),
+        width=1100,
+        showlegend=True,
+        template="plotly_white",
+        hovermode="x unified",
     )
-    
-    fig.show()
+
+    if show:
+        fig.show()
+
+    return fig

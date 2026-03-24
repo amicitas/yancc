@@ -56,3 +56,56 @@ Implemented the automated convergence scan tool based on the plan in `temp/conve
 
 5. `devel_ai/features_request.md`:
    - Updated the convergence scan feature entry to "Done".
+
+--- Session Log: 2026-03-23 (Improved Convergence Scan Plotting) ---
+Tool: Claude (via OpenCode)
+
+1. Created `CLAUDE.md`:
+   - Wrote project rules file for Claude-based AI tools, mirroring GEMINI.md with
+     additions: Architecture Notes, Testing commands, Project Structure, expanded
+     Coding Standards (Black, isort, NumPy docstrings). Removed Gemini-specific
+     "Full Diffs" rule.
+
+2. `yancc/yancctools/yancctools_convergence.py`:
+   - Added `identify_species_name()` utility that maps Species objects to
+     human-readable names (Electron, Hydrogen, etc.) by mass/charge lookup table.
+   - `run_convergence_scan()` now stores additional metadata in results dict:
+     `species_names`, `nominal_values`, `rho`, `erho` -- all HDF5-compatible.
+   - Fixed `generate_scan_range()` to always include the nominal value in the
+     scan range. Previously, nominal values like na=35, nt=13, nz=25 were not
+     guaranteed to appear as scan points, causing empty deviation plots.
+   - Reformatted with Black-compatible style, sorted imports with isort.
+   - Updated AI disclaimer to include Claude.
+
+3. `yancc/yancctools/yancctools_plot.py`:
+   - Rewrote `plot_convergence_scan()` with the following improvements:
+     * Layout changed to one row per parameter, two columns: absolute particle
+       flux (left) and percent deviation from nominal (right).
+     * Species names from results dict used in legends instead of "Species 0".
+     * Dashed vertical lines mark the nominal resolution on each subplot.
+     * Percent deviation calculated as (flux - flux_nominal) / |flux_nominal| * 100%.
+     * Consistent styling: plotly_white template, hovermode="x unified",
+       coordinated color scheme across species.
+     * Title includes runid, rho, and erho for context.
+     * Function now returns the Plotly figure object; new `show` parameter
+       controls whether fig.show() is called.
+     * Backward compatible: handles old results dicts without new keys via
+       .get() defaults, and uses np.interp fallback when nominal value is
+       not an exact scan point.
+   - Fixed nominal flux lookup: uses int() cast for type-safe comparison
+     (handles numpy int64 from HDF5 round-trips).
+   - Updated AI disclaimer to include Claude.
+
+4. `yancc/yancctools/__init__.py`:
+   - Added `identify_species_name` to exports.
+
+5. `devel_ai/features_request.md`:
+   - Added "Improved convergence scan plotting" feature entry (Pending).
+
+Key findings:
+   - The original `generate_scan_range` with linspace + odd rounding often
+     missed the nominal value (e.g., na=35 produced scan points [17, 43, 71]).
+     This caused empty deviation plots for na, nt, nz while nx=5 worked by
+     coincidence (5 happened to be included in its own range).
+   - Species objects in yancc have no name attribute; identification requires
+     reverse-lookup by mass (in proton masses) and charge (in elementary charges).
