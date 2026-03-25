@@ -107,5 +107,27 @@ Key findings:
      missed the nominal value (e.g., na=35 produced scan points [17, 43, 71]).
      This caused empty deviation plots for na, nt, nz while nx=5 worked by
      coincidence (5 happened to be included in its own range).
-   - Species objects in yancc have no name attribute; identification requires
-     reverse-lookup by mass (in proton masses) and charge (in elementary charges).
+    - Species objects in yancc have no name attribute; identification requires
+      reverse-lookup by mass (in proton masses) and charge (in elementary charges).
+
+--- Session Log: 2026-03-23 (CLAUDE.md Improvements) ---
+Tool: Claude (via OpenCode)
+
+1. `CLAUDE.md` improvements:
+   - Added GitHub repo URL (https://github.com/f0uriest/yancc) and docs URL
+     (https://yancc.readthedocs.io/) at the top of the file.
+   - Added new Dependencies section documenting core (jax, equinox, lineax),
+     numerics (numpy, scipy, interpax, orthax, quadax), typing (jaxtyping),
+     I/O (netcdf4), and optional/dev (desc-opt, plotly, pyyaml, h5py)
+     dependencies with brief role descriptions.
+   - Added coding standard: use `ii`, `jj`, `kk` instead of `i`, `j`, `k`
+     for loop variable names (avoids shadowing, improves searchability).
+   - Added "Plan Before Coding" core mandate: always develop a plan and
+     present it to the user for approval before generating or modifying code.
+
+Key findings:
+   - Codebase exploration revealed several other potential improvements
+     (expanded project structure, CI/CD docs, architecture details) that
+     the user may want to add in a future session.
+   - `plotly`, `pyyaml`, and `h5py` are used by yancctools but missing
+     from `requirements.txt` -- documented as optional/dev deps for now.

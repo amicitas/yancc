@@ -1,5 +1,8 @@
 # Project Rules: Yancc
 
+- **GitHub:** https://github.com/f0uriest/yancc
+- **Docs:** https://yancc.readthedocs.io/
+
 ## Core Mandates
 - **No Backwards Compatibility:** Prioritize clean, modern refactoring and optimal API design over maintaining compatibility with older versions or structures.
 - **Input Dictionaries:** Prefer using an `options` or `config` dictionary for function inputs instead of long lists of keyword arguments.
@@ -12,6 +15,7 @@
     - Add the high-level AI tool identifier eg. Gemini, Claude, Codex etc.
     - Example: `This file includes AI generated code (Gemini/Claude/Codex)`
     - When new functions or methods are entirely generated through an AI tool, put a similar appropriate disclaimer in the doc string.
+- **Plan Before Coding:** Before generating or modifying code, always develop a plan outlining the proposed changes and present it to the user for approval. Do not proceed with implementation until the user has reviewed and approved the plan.
 - **Session Logging:** When the user asks to close a session write a descriptive log of the current session's changes and key findings to `devel_ai/devel_ai_log.txt`.
 - **Feature Requests:**
     - **Creation:** Upon identifying a new feature or significant change request, immediately add it to `devel_ai/features_request.md` with the current date and "Pending" status.
@@ -25,6 +29,7 @@
 - Visualization tools (Plotly) should handle metadata keys (like `runid`) gracefully.
 - I prefer spaces over tabs in all situations.
 - Follow NumPy-style docstrings (project uses `flake8-docstrings` with numpy convention).
+- Use `ii`, `jj`, `kk` instead of `i`, `j`, `k` for loop variable names (avoids shadowing and improves searchability).
 - Format code with Black (line length 88) and sort imports with isort (profile: black).
 
 ## Architecture Notes
@@ -32,6 +37,13 @@
 - Linear operators follow the `lineax.AbstractLinearOperator` interface with `mv()` methods.
 - Array types are annotated with `jaxtyping` (e.g., `Float[Array, "ntheta nzeta"]`).
 - JAX 64-bit precision is enforced globally (`jax_enable_x64 = True`).
+
+## Dependencies
+- **Core:** `jax` (autodiff/array computation), `equinox` (immutable JAX-compatible modules), `lineax` (linear operator/solver interface)
+- **Numerics:** `numpy`, `scipy`, `interpax` (JAX interpolation), `orthax` (orthogonal polynomials), `quadax` (quadrature)
+- **Typing:** `jaxtyping` (array shape/dtype annotations)
+- **I/O:** `netcdf4` (VMEC/booz_xform data)
+- **Optional/Dev:** `desc-opt` (stellarator equilibria, used for `Field.from_desc()` and test fixtures), `plotly` (visualization in yancctools), `pyyaml` (YAML I/O in yancctools), `h5py` (HDF5 I/O in yancctools)
 
 ## Testing
 - Run tests: `python -m pytest -v tests/`
