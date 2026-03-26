@@ -3,7 +3,7 @@ Some tools to help with running performance scans in parameters:
  - Ambipolar solover for Er
  - Profile scans over rho
 
-This file includes AI generated code (Gemini)
+This file includes AI generated code (Gemini/Claude)
 Please be careful in using this code and YMMV.
 """
 
@@ -295,11 +295,29 @@ def scan_ambipolar_profile(
 
     # Sort results by rho
     scan_results_list.sort(key=lambda x: x[0])
-    
+
+    # Capture profile data on the rho grid so it can be saved to HDF5
+    # and used for plotting without requiring live species objects.
+    # Late import to avoid circular dependency with yancctools_convergence.
+    from yancc.yancctools.yancctools_convergence import identify_species_name
+
+    profiles = {
+        "rho": [float(r) for r in rho_grid],
+        "species": [
+            {
+                "name": identify_species_name(s),
+                "temperature": [float(s.temperature(r)) for r in rho_grid],
+                "density": [float(s.density(r)) for r in rho_grid],
+            }
+            for s in global_species
+        ],
+    }
+
     # Construct results dictionary in the new HDF5-friendly format
     results = {
         "runid": runid,
         "options": opts,
+        "profiles": profiles,
         "scan_results": [
             {
                 "rho": rho,

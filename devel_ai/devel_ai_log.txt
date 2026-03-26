@@ -129,5 +129,84 @@ Key findings:
    - Codebase exploration revealed several other potential improvements
      (expanded project structure, CI/CD docs, architecture details) that
      the user may want to add in a future session.
-   - `plotly`, `pyyaml`, and `h5py` are used by yancctools but missing
-     from `requirements.txt` -- documented as optional/dev deps for now.
+    - `plotly`, `pyyaml`, and `h5py` are used by yancctools but missing
+      from `requirements.txt` -- documented as optional/dev deps for now.
+
+--- Session Log: 2026-03-25 (Run Reports Feature) ---
+Tool: Claude (via OpenCode)
+
+New feature: browser-based run report interface using Dash and Plotly.
+
+1. `yancc/yancctools/yancctools.py`:
+   - `scan_ambipolar_profile()` now saves profile data (temperature, density,
+     species names) on the rho grid into the results dict under
+     `results["profiles"]`. This allows plotting profiles from HDF5 without
+     needing live species objects.
+   - Uses late import of `identify_species_name` from yancctools_convergence
+     to avoid circular dependency.
+   - Updated AI disclaimer to include Claude.
+
+2. `yancc/yancctools/yancctools_plot.py`:
+   - All plot functions now return `plotly.graph_objects.Figure` and accept a
+     `show=True` parameter (matching the existing `plot_convergence_scan`
+     convention). Functions affected: `plot_ambipolar_profile`,
+     `plot_ambipolar_scan`, `plot_ambipolar_summary`.
+   - `plot_ambipolar_summary()` now falls back to `results["profiles"]`
+     when `global_species` is None, enabling profile plots from saved data.
+   - Added new `plot_profiles()` function: standalone two-panel (T, n vs rho)
+     plot from saved profile data in results dict.
+   - Updated module docstring documenting the return-figure convention.
+
+3. `yancc/yancctools/yancctools_runreports.py` (NEW):
+   - Full Dash application for browsing saved runs in a directory.
+   - `discover_runs(directory)`: scans for subdirectories matching the
+     runid pattern (R\d+-[A-Z]{3}-\d{6}-\d{6}), returns metadata list
+     sorted newest-first. Handles empty/non-existent directories gracefully.
+   - `detect_run_type(results)`: classifies runs as "ambipolar" or
+     "convergence" based on results dict structure.
+   - `_extract_run_info()`: builds human-readable config/metadata tables
+     from options and results dicts.
+   - `_build_ambipolar_results_table()`: per-rho summary of roots (ion,
+     unstable, electron) in kV/m.
+   - `_build_convergence_results_table()`: per-parameter flux summary with
+     nominal value highlighting.
+   - `create_app(directory)`: constructs Dash app with fixed sidebar
+     (directory display, refresh button, clickable run list) and main
+     content area (run info panel, results table, embedded Plotly plots).
+   - `launch_run_reports(directory, config)`: public API entry point.
+   - `main(argv)`: argparse-based CLI entry point with --host, --port,
+     --no-debug options. Directory defaults to current directory.
+   - `dash` is imported lazily inside `create_app()` only, so the module
+     can be imported without dash installed.
+
+4. `yancc/yancctools/__main__.py` (NEW):
+   - Enables `python -m yancc.yancctools /path/to/runs/` invocation.
+   - Thin wrapper that calls `main()` from yancctools_runreports.
+
+5. `yancc/yancctools/__init__.py`:
+   - Added exports: `plot_profiles`, `launch_run_reports`, `run_reports_main`.
+
+6. `setup.py`:
+   - Console_scripts entry point was added then reverted per user request.
+   - File is unchanged from its original state.
+
+7. `devel_ai/features_request.md`:
+   - Added "Browser-based run reports" feature tracking entry.
+
+CLI usage (two methods):
+   python -m yancc.yancctools /path/to/runs/
+   python -m yancc.yancctools /path/to/runs/ --port 9000 --host 0.0.0.0
+
+Python API usage:
+   from yancc.yancctools import launch_run_reports
+   launch_run_reports("/path/to/runs/")
+
+Key findings:
+   - Dash 4.1.0 is installed in the environment but not in requirements.txt
+     (optional dependency like plotly).
+   - All plot functions previously called fig.show() without returning the
+     figure, except plot_convergence_scan. Now all are consistent.
+   - Circular import between yancctools.py and yancctools_convergence.py
+     required a late import pattern for identify_species_name.
+   - Empty directory handling verified: app starts, sidebar shows "No runs
+     found", main area shows placeholder message.

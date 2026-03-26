@@ -30,4 +30,7 @@ from .yancctools_plot import (
     plot_ambipolar_profile,
     plot_ambipolar_summary,
     plot_convergence_scan,
+    plot_profiles,
 )
+
+from .yancctools_runreports import launch_run_reports, main as run_reports_main

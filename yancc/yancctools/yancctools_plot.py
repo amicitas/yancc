@@ -1,17 +1,34 @@
 # This file includes AI generated code (Gemini/Claude)
 """
 Plotting routines for yancctools.
+
+All plot functions return a ``plotly.graph_objects.Figure`` and accept a
+``show`` parameter (default ``True``).  When ``show=False`` the figure is
+returned without calling ``fig.show()``, which is useful for embedding in
+Dash applications.
 """
 
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-def plot_ambipolar_profile(results: dict):
+def plot_ambipolar_profile(results: dict, show: bool = True):
     """
-    Plots the radial profile of ambipolar electric fields in kV/m.
-    
-    This method was entirely generated through an AI tool (Gemini 3.5 Sonnet).
+    Plot the radial profile of ambipolar electric fields in kV/m.
+
+    This method was entirely generated through an AI tool (Gemini/Claude).
+
+    Parameters
+    ----------
+    results : dict
+        Output dictionary from ``scan_ambipolar_profile``.
+    show : bool, optional
+        If True (default), call ``fig.show()``.
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        The Plotly figure object.
     """
     # Convert string keys back to floats for numerical plotting and sorting
     # Skip metadata keys like 'runid'
@@ -68,17 +85,40 @@ def plot_ambipolar_profile(results: dict):
         hovermode="x unified"
     )
 
-    fig.show()
+    if show:
+        fig.show()
+
+    return fig
 
 
-def plot_ambipolar_summary(results: dict, global_species: list = None):
+def plot_ambipolar_summary(
+    results: dict, global_species: list = None, show: bool = True
+):
     """
-    Displays a comprehensive summary page including:
-    1. Input Profiles (T, n)
-    2. All individual net charge flux scans (flux vs Er)
-    3. Final ambipolar Er profile
-    
-    This method was entirely generated through an AI tool (Gemini 3.5 Sonnet).
+    Display a comprehensive summary page including input profiles, flux
+    scans, and the radial Er profile.
+
+    Profile data can come from either live ``global_species`` objects or
+    from the ``results["profiles"]`` dictionary saved by
+    ``scan_ambipolar_profile``.  If both are provided, ``global_species``
+    takes precedence.
+
+    This method was entirely generated through an AI tool (Gemini/Claude).
+
+    Parameters
+    ----------
+    results : dict
+        Output dictionary from ``scan_ambipolar_profile``.
+    global_species : list, optional
+        List of GlobalMaxwellian species objects.  When *None*, the
+        function falls back to ``results["profiles"]``.
+    show : bool, optional
+        If True (default), call ``fig.show()``.
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        The Plotly figure object.
     """
     runid = results.get("runid", "unknown")
     scan_data = results.get("scan_results", [])
@@ -97,25 +137,39 @@ def plot_ambipolar_summary(results: dict, global_species: list = None):
         horizontal_spacing=0.1
     )
 
-    # 1. Plot Input Profiles (if provided)
+    # 1. Plot Input Profiles
+    # Prefer live species objects; fall back to saved profile data.
     if global_species:
         rho_dense = np.linspace(0, 1, 100)
         for s in global_species:
             name = s.species.__class__.__name__ if hasattr(s.species, "__class__") else str(s.species)
-            # Find a friendly name
-            if "Electron" in str(s.species): name = "Electrons"
-            elif "Hydrogen" in str(s.species): name = "Hydrogen"
-            
-            # Temperature
-            T_vals = np.array([float(s.temperature(r)) for r in rho_dense]) / 1e3 # to keV
+            if "Electron" in str(s.species):
+                name = "Electrons"
+            elif "Hydrogen" in str(s.species):
+                name = "Hydrogen"
+
+            T_vals = np.array([float(s.temperature(r)) for r in rho_dense]) / 1e3
             fig.add_trace(go.Scatter(
                 x=rho_dense, y=T_vals, name=f"T_{name}", legendgroup="profiles"
             ), row=1, col=1)
-            
-            # Density
-            n_vals = np.array([float(s.density(r)) for r in rho_dense]) / 1e20 # to 10^20
+
+            n_vals = np.array([float(s.density(r)) for r in rho_dense]) / 1e20
             fig.add_trace(go.Scatter(
                 x=rho_dense, y=n_vals, name=f"n_{name}", legendgroup="profiles"
+            ), row=1, col=2)
+    elif "profiles" in results:
+        profiles = results["profiles"]
+        rho_arr = np.array(profiles["rho"])
+        for sp in profiles["species"]:
+            name = sp["name"]
+            T_vals = np.array(sp["temperature"]) / 1e3  # eV -> keV
+            fig.add_trace(go.Scatter(
+                x=rho_arr, y=T_vals, name=f"T_{name}", legendgroup="profiles"
+            ), row=1, col=1)
+
+            n_vals = np.array(sp["density"]) / 1e20  # m^-3 -> 10^20 m^-3
+            fig.add_trace(go.Scatter(
+                x=rho_arr, y=n_vals, name=f"n_{name}", legendgroup="profiles"
             ), row=1, col=2)
 
     # 2. Plot all flux scans
@@ -196,14 +250,41 @@ def plot_ambipolar_summary(results: dict, global_species: list = None):
     fig.update_yaxes(title_text="Charge Flux [A/m^2]", row=2, col=1)
     fig.update_yaxes(title_text="Er [kV/m]", row=2, col=2)
 
-    fig.show()
+    if show:
+        fig.show()
+
+    return fig
 
 
-def plot_ambipolar_scan(erho_grid: np.ndarray, flux_diffs: np.ndarray, roots: list, title: str = "Ambipolar Electric Field Search"):
+def plot_ambipolar_scan(
+    erho_grid: np.ndarray,
+    flux_diffs: np.ndarray,
+    roots: list,
+    title: str = "Ambipolar Electric Field Search",
+    show: bool = True,
+):
     """
-    Visualizes the coarse Erho scan and the refined ambipolar roots in kV/m.
-    
-    This method was entirely generated through an AI tool (Gemini 3.5 Sonnet).
+    Visualize the coarse Erho scan and the refined ambipolar roots in kV/m.
+
+    This method was entirely generated through an AI tool (Gemini/Claude).
+
+    Parameters
+    ----------
+    erho_grid : np.ndarray
+        Array of Er values from the coarse scan.
+    flux_diffs : np.ndarray
+        Net charge flux at each Er value.
+    roots : list
+        List of root dicts (with ``"Er"`` key) or raw float values.
+    title : str, optional
+        Plot title.
+    show : bool, optional
+        If True (default), call ``fig.show()``.
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        The Plotly figure object.
     """
     fig = go.Figure()
 
@@ -251,7 +332,10 @@ def plot_ambipolar_scan(erho_grid: np.ndarray, flux_diffs: np.ndarray, roots: li
         hovermode="x unified"
     )
 
-    fig.show()
+    if show:
+        fig.show()
+
+    return fig
 
 
 def plot_convergence_scan(results: dict, show: bool = True):
@@ -448,6 +532,103 @@ def plot_convergence_scan(results: dict, show: bool = True):
         height=max(400, 350 * rows),
         width=1100,
         showlegend=True,
+        template="plotly_white",
+        hovermode="x unified",
+    )
+
+    if show:
+        fig.show()
+
+    return fig
+
+
+def plot_profiles(results: dict, show: bool = True):
+    """
+    Plot temperature and density profiles from saved profile data.
+
+    This is a standalone two-panel plot (temperature and density vs rho)
+    that works from the ``results["profiles"]`` dictionary saved by
+    ``scan_ambipolar_profile``, without requiring live species objects.
+
+    This function was entirely generated through an AI tool (Claude).
+
+    Parameters
+    ----------
+    results : dict
+        Output dictionary from ``scan_ambipolar_profile`` containing a
+        ``"profiles"`` key.
+    show : bool, optional
+        If True (default), call ``fig.show()``.
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+        The Plotly figure object, or *None* if no profile data is found.
+    """
+    profiles = results.get("profiles")
+    if profiles is None:
+        return None
+
+    runid = results.get("runid", "unknown")
+    rho_arr = np.array(profiles["rho"])
+
+    fig = make_subplots(
+        rows=1,
+        cols=2,
+        subplot_titles=("Temperature [keV]", "Density [10^20 m^-3]"),
+        horizontal_spacing=0.12,
+    )
+
+    _colors = [
+        "royalblue",
+        "crimson",
+        "seagreen",
+        "darkorange",
+        "mediumpurple",
+        "goldenrod",
+    ]
+
+    for ii, sp in enumerate(profiles["species"]):
+        name = sp["name"]
+        color = _colors[ii % len(_colors)]
+
+        T_vals = np.array(sp["temperature"]) / 1e3  # eV -> keV
+        fig.add_trace(
+            go.Scatter(
+                x=rho_arr,
+                y=T_vals,
+                mode="lines+markers",
+                name=f"T_{name}",
+                line=dict(color=color, width=2),
+                marker=dict(size=5),
+            ),
+            row=1,
+            col=1,
+        )
+
+        n_vals = np.array(sp["density"]) / 1e20  # m^-3 -> 10^20 m^-3
+        fig.add_trace(
+            go.Scatter(
+                x=rho_arr,
+                y=n_vals,
+                mode="lines+markers",
+                name=f"n_{name}",
+                line=dict(color=color, width=2, dash="dash"),
+                marker=dict(size=5),
+            ),
+            row=1,
+            col=2,
+        )
+
+    fig.update_xaxes(title_text="rho", row=1, col=1)
+    fig.update_xaxes(title_text="rho", row=1, col=2)
+    fig.update_yaxes(title_text="T [keV]", row=1, col=1)
+    fig.update_yaxes(title_text="n [10^20 m^-3]", row=1, col=2)
+
+    fig.update_layout(
+        title_text=f"Input Profiles (RunID: {runid})",
+        height=450,
+        width=1000,
         template="plotly_white",
         hovermode="x unified",
     )
