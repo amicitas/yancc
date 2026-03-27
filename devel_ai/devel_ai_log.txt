@@ -208,5 +208,38 @@ Key findings:
      figure, except plot_convergence_scan. Now all are consistent.
    - Circular import between yancctools.py and yancctools_convergence.py
      required a late import pattern for identify_species_name.
-   - Empty directory handling verified: app starts, sidebar shows "No runs
-     found", main area shows placeholder message.
+    - Empty directory handling verified: app starts, sidebar shows "No runs
+      found", main area shows placeholder message.
+
+--- Session Log: 2026-03-26 (Part 6 Notebook: VMEC Convergence + Radial Ambipolar Scan) ---
+Tool: Claude (via OpenCode)
+
+Created Part 6 notebook combining convergence scanning and radial ambipolar
+Er scanning using a VMEC equilibrium instead of DESC.
+
+1. `notebooks/2026-03-24 - Development of tools to help with comparison of
+   yancc to sfincs - Part 6 - VMEC convergence and radial ambipolar scan.ipynb` (NEW):
+   - 19 cells across 5 sections: Imports, Configuration, Profiles,
+     Convergence Scan, Radial Ambipolar Scan.
+   - Uses VMEC equilibrium (`/u/npablant/data/w7x/vmec/w7x_ref_172/wout.nc`)
+     with `eq_type="vmec"` throughout -- no DESC dependency.
+   - Loads SFINCS polynomial profiles (same as Part 4) via
+     `sfincstools.generate_profile_functions`, scaled to SI units.
+   - Convergence scan at rho=0.2, Er=0.0 using `run_convergence_scan`.
+   - Radial ambipolar scan over rho=[0.2, 0.8] with 5 points using
+     `scan_ambipolar_profile`.
+   - Single shared `options` dict (JSON/YAML compatible) drives both scans.
+   - Full I/O round-trip validation in both sections (save, del, reload, plot).
+   - Includes AI-generated code disclaimer (Claude).
+
+2. `devel_ai/features_request.md`:
+   - Added tracking entry for Part 6 notebook (Pending status).
+
+Key design decisions:
+   - Notebook ordered convergence-first, then radial scan, so resolution
+     settings can be validated before committing to the expensive scan.
+   - Velocity grids constructed from options dict values (`options["nx"]`,
+     `options["na"]`) to ensure consistency between convergence and scan.
+   - yancctools internally handles the rho -> s=rho^2 conversion for VMEC
+     via `Field.from_vmec(eq_data, rho**2, nt, nz)` in `_worker_rho_scan`
+     and `run_convergence_scan`.
