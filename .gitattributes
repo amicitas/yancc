@@ -1,1 +1,5 @@
 yancc/_version.py export-subst
+
+*.ipynb filter=nbstripout
+*.zpln filter=nbstripout
+*.ipynb diff=ipynb
